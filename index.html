@@ -32,7 +32,7 @@ const DEF=[
 {id:"wj",name:"Winterjacke",layer:"outer",w:4,wind:1,rain:0,own:1},
 {id:"rj",name:"Regenjacke",layer:"outer",w:1.5,wind:1,rain:1,own:1},
 {id:"us",name:"Regenschirm",layer:"acc",w:0,wind:0,rain:1,trig:"rain",own:1}];
-let S={items:DEF,entries:[],wx:{t:12,f:12,wind:10,hum:70,rain:0}},tab="heute",sel=new Set(),fb="passt",note="";
+let S={items:DEF,entries:[],wx:{t:12,f:12,wind:10,hum:70,rain:0}},tab="heute",sel=new Set(),fb="passt",ed=-1,dl=-1,note="";
 try{const r=localStorage.getItem(LS);if(r){const d=JSON.parse(r);S.items=d.items||DEF;S.entries=d.entries||[];S.wx=d.wx||S.wx;S.acc1=d.acc1}}catch(e){}
 S.wx.act??=1;if(!S.items.some(i=>i.layer==="acc")&&!S.acc1){S.items.push({id:"us",name:"Regenschirm",layer:"acc",w:0,wind:0,rain:1,trig:"rain",own:1})}S.acc1=1;S.wx.tod=(h=>h<11?0:h<17?1:2)(new Date().getHours());
 const save=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
@@ -60,8 +60,16 @@ function combos(wx,need){
  return res.sort((a,b)=>a.pen-b.pen).slice(0,3);
 }
 const feels=wx=>wx.t-Math.max(0,wx.wind-5)*.12;
-function acc(){const w=S.wx,L=[];own().filter(i=>i.layer==="acc").forEach(i=>{const r=w.rain;if(i.trig==="rain"){if(r>=.5)L.push(["☔ "+i.name,"Regen: "+r+" mm"]);else if(r>0)L.push(["🌦 "+i.name+" (optional)","Nur Nieselregen: "+r+" mm"])}else if(w.f<=5)L.push(["🧣 "+i.name,"Gefühlt "+w.f+" °C"])});return L.length?`<div class="card"><h2>Mitnehmen</h2>${L.map(x=>`<div class="alt"><b>${esc(x[0])}</b> <span class="mu">${esc(x[1])}</span></div>`).join("")}</div>`:""}
-function nav(){$("#nav").innerHTML=[["heute","Heute"],["eintrag","Eintrag"],["schrank","Schrank"],["daten","Daten"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="tab='${k}';render()">${l}</button>`).join("")}
+function accT(it){const c=it.trig==="cold",sg=c?-1:1,st=c?.5:.1,D=c?-5:.5,lo=c?-20:.1,hi=c?10:5,
+L=S.entries.filter(e=>(e.accA||[]).includes(it.id)),x=e=>sg*(c?e.wx.f:e.wx.rain),
+fin=t=>{t=Math.round(Math.min(hi,Math.max(lo,t))/st)*st;t=Math.round(t*10)/10;return{t:c?-t:t,n:L.length}};
+if(L.length<3)return fin(D);
+const ys=L.filter(e=>e.accT.includes(it.id)).map(x),ns=L.filter(e=>!e.accT.includes(it.id)).map(x);
+let t;if(!ys.length)t=Math.max(D,Math.max(...ns)+st);else if(!ns.length)t=Math.min(D,Math.min(...ys));
+else{const v=[...new Set(L.map(x))].sort((a,b)=>a-b),cs=[v[0]-st,...v.map((q,i)=>i<v.length-1?(q+v[i+1])/2:q+st)];let b=1e9;cs.forEach(q=>{const er=ns.filter(r=>r>=q).length+ys.filter(r=>r<q).length;if(er<b||(er===b&&Math.abs(q-D)<Math.abs(t-D))){b=er;t=q}})}
+return fin(t)}
+function acc(){const w=S.wx,L=[];own().filter(i=>i.layer==="acc").forEach(i=>{const T=accT(i).t,r=w.rain;if(i.trig==="rain"){if(r>=T)L.push(["☔ "+i.name,"Regen: "+r+" mm (deine Schwelle: "+T+" mm)"]);else if(r>0)L.push(["🌦 "+i.name+" (optional)","Leichter Regen: "+r+" mm, deine Schwelle: "+T+" mm"])}else if(w.f<=T)L.push(["🧣 "+i.name,"Gefühlt "+w.f+" °C (deine Schwelle: "+T+" °C)"])});return L.length?`<div class="card"><h2>Mitnehmen</h2>${L.map(x=>`<div class="alt"><b>${esc(x[0])}</b> <span class="mu">${esc(x[1])}</span></div>`).join("")}</div>`:""}
+function nav(){$("#nav").innerHTML=[["heute","Heute"],["eintrag","Eintrag"],["schrank","Schrank"],["daten","Daten"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="tab='${k}';ed=dl=-1;render()">${l}</button>`).join("")}
 function wxForm(){const w=S.wx;return`<div class="g">
 <div><label>Temperatur °C</label><input type="number" step="0.5" id="t" value="${w.t}"></div>
 <div><label>Gefühlt °C</label><input type="number" step="0.5" id="f" value="${w.f}"></div>
@@ -93,38 +101,40 @@ function heute(){
 }
 function eintrag(){
  return`<div class="card"><h2>Wetter beim Rausgehen</h2>${wxForm()}</div>
- <div class="card"><h2>Was hast du getragen?</h2><div class="chips">${own().filter(i=>i.layer!=="acc").map(i=>`<button class="chip ${sel.has(i.id)?"on":""}" onclick="tg('${i.id}')">${esc(i.name)}</button>`).join("")}</div></div>
- <div class="card"><h2>Wie war es?</h2><div class="chips">${[["kalt","Zu kalt"],["passt","Passt"],["warm","Zu warm"]].map(([k,l])=>`<button class="chip ${fb===k?"on":""}" onclick="fb='${k}';render()">${l}</button>`).join("")}</div>
+ <div class="card"><h2>Was hattest du an oder dabei?</h2><div class="chips">${own().map(i=>`<button class="chip ${sel.has(i.id)?"on":""}" onclick="tg('${i.id}')">${esc(i.name)}</button>`).join("")}</div></div>
+ <div class="card"><h2>Wie war es?</h2><div class="chips">${[["kalt","Zu kalt"],["passt","Passt"],["warm","Zu warm"]].map(([k,l])=>`<button class="chip ${fb===k?"on":""}" onclick="readWx();fb='${k}';render()">${l}</button>`).join("")}</div>
  <button class="p" onclick="add()">Eintrag speichern</button><div class="mu" style="margin-top:6px">${esc(note)}</div></div>`;
 }
 function tg(id){readWx();sel.has(id)?sel.delete(id):sel.add(id);render()}
 function add(){
  readWx();const w=S.items.filter(i=>sel.has(i.id));
- if(!w.length){note="Bitte mindestens ein Kleidungsstück wählen.";render();return}
- const tot=w.reduce((s,x)=>s+x.w,0),need=Math.max(0,tot+(fb==="kalt"?1.5:fb==="warm"?-1.5:0));
- S.entries.push({date:new Date().toISOString().slice(0,10),wx:{...S.wx},worn:w.map(x=>x.name),total:tot,fb,need});
+ const cl=w.filter(i=>i.layer!=="acc");if(!cl.length){note="Bitte mindestens ein Kleidungsstück wählen.";render();return}
+ const tot=cl.reduce((s,x)=>s+x.w,0),need=Math.max(0,tot+(fb==="kalt"?1.5:fb==="warm"?-1.5:0));
+ S.entries.push({date:new Date().toISOString().slice(0,10),wx:{...S.wx},worn:cl.map(x=>x.name),total:tot,fb,need,accT:w.filter(i=>i.layer==="acc").map(i=>i.id),accA:own().filter(i=>i.layer==="acc").map(i=>i.id)});
  save();sel=new Set();fb="passt";note="Gespeichert.";render();
 }
 function schrank(){
  return`<div class="card"><h2>Mein Kleiderschrank</h2><div class="mu">Haken = besitze ich. Wärmewert anpassbar.</div>
- ${S.items.map((i,k)=>`<div class="row"><label style="display:flex;gap:8px;align-items:center;color:var(--tx);font-size:16px"><input type="checkbox" style="width:auto" ${i.own?"checked":""} onchange="S.items[${k}].own=this.checked?1:0;save()">${esc(i.name)}</label>${i.layer==="acc"?"":`<input type="number" step="0.5" value="${i.w}" onchange="S.items[${k}].w=parseFloat(this.value)||0;save()">`}<span style="display:flex;gap:4px"><button class="s" onclick="renItem(${k})">✎</button><button class="s" onclick="delItem(${k})">✕</button></span></div>`).join("")}</div>
+ ${S.items.map((i,k)=>`<div class="row"><label style="display:flex;gap:8px;align-items:center;color:var(--tx);font-size:16px;flex:1"><input type="checkbox" style="width:auto" ${i.own?"checked":""} onchange="S.items[${k}].own=this.checked?1:0;save()">${ed===k?`<input id="en" value="${esc(i.name)}" style="width:100%;min-width:100px">`:esc(i.name)}</label>${i.layer==="acc"?"":`<input type="number" step="0.5" value="${i.w}" onchange="S.items[${k}].w=parseFloat(this.value)||0;save()">`}<span style="display:flex;gap:4px">${ed===k?`<button class="s" onclick="saveRen(${k})">✓</button>`:`<button class="s" onclick="ed=${k};dl=-1;render()">✎</button>`}${dl===k?`<button class="s" style="color:#d33" onclick="delItem(${k})">Löschen?</button>`:`<button class="s" onclick="dl=${k};ed=-1;render()">✕</button>`}</span></div>`).join("")}</div>
  <div class="card"><h2>Teil hinzufügen</h2><div class="g"><div><label>Name</label><input id="nn"></div>
- <div><label>Schicht</label><select id="nl"><option value="base">Unterschicht</option><option value="mid">Mittelschicht</option><option value="outer">Jacke</option><option value="acc">Zubehör (z. B. Schirm)</option></select></div>
- <div><label>Wärme</label><input id="nw" type="number" step="0.5" value="2"></div>
- <div><label>Schutz</label><select id="np"><option value="0">keiner</option><option value="1">Wind</option><option value="2">Wind + Regen</option></select></div>
- <div><label>Zubehör zeigen bei</label><select id="nt"><option value="rain">Regen</option><option value="cold">Kälte (unter 5 °C)</option></select></div></div>
+ <div><label>Schicht</label><select id="nl" onchange="fm()"><option value="base">Unterschicht</option><option value="mid">Mittelschicht</option><option value="outer">Jacke</option><option value="acc">Zubehör (z. B. Schirm)</option></select></div>
+ <div id="fw"><label>Wärme</label><input id="nw" type="number" step="0.5" value="2"></div>
+ <div id="fs"><label>Schutz</label><select id="np"><option value="0">keiner</option><option value="1">Wind</option><option value="2">Wind + Regen</option></select></div>
+ <div id="ft" style="display:none"><label>Zubehör zeigen bei</label><select id="nt"><option value="rain">Regen</option><option value="cold">Kälte (unter 5 °C)</option></select></div></div>
  <button class="p" onclick="addItem()">Hinzufügen</button></div>`;
 }
 function addItem(){const n=$("#nn").value.trim();if(!n)return;const p=+$("#np").value;
- S.items.push({id:"c"+Date.now(),name:n,layer:$("#nl").value,w:parseFloat($("#nw").value)||0,wind:p>=1?1:0,rain:p===2?1:0,trig:$("#nt").value,own:1});save();render()}
-function renItem(k){const n=prompt("Neuer Name:",S.items[k].name);if(n&&n.trim()){S.items[k].name=n.trim();save();render()}}
-function delItem(k){if(confirm("Wirklich löschen?")){S.items.splice(k,1);save();render()}}
+ S.items.push({id:"c"+Date.now(),name:n,layer:$("#nl").value,w:$("#nl").value==="acc"?0:(parseFloat($("#nw").value)||0),wind:p>=1?1:0,rain:p===2?1:0,trig:$("#nt").value,own:1});save();render()}
+function saveRen(k){const n=$("#en").value.trim();if(n)S.items[k].name=n;ed=-1;save();render()}
+function fm(){const a=$("#nl").value==="acc";$("#fw").style.display=a?"none":"";$("#fs").style.display=a?"none":"";$("#ft").style.display=a?"":"none"}
+function delItem(k){S.items.splice(k,1);dl=-1;save();render()}
 function daten(){
- return`<div class="card"><h2>Einträge (${S.entries.length})</h2>
+ return`${own().some(i=>i.layer==="acc")?`<div class="card"><h2>Zubehör-Schwellen</h2>${own().filter(i=>i.layer==="acc").map(i=>{const a=accT(i);return`<div class="row"><div>${esc(i.name)}<div class="mu">${a.n<3?"Noch Standardwert":"Gelernt aus "+a.n+" Einträgen"}</div></div><b>${i.trig==="cold"?"bis "+a.t+" °C":"ab "+a.t+" mm"}</b></div>`}).join("")}</div>`:""}<div class="card"><h2>Einträge (${S.entries.length})</h2>
  ${S.entries.slice().reverse().map((e,i)=>`<div class="row"><div>${esc(e.date)} · ${esc(e.worn.join(" + "))}<div class="mu">${e.wx.f}°C gefühlt, ${e.wx.wind} km/h · ${["ruhig","normal","sportlich"][e.wx.act??1]} · ${["morgens","tagsüber","abends"][e.wx.tod??1]} · ${e.fb==="kalt"?"zu kalt":e.fb==="warm"?"zu warm":"passt"}</div></div><button class="s" onclick="S.entries.splice(${S.entries.length-1-i},1);save();render()">✕</button></div>`).join("")||'<div class="mu">Noch keine Einträge.</div>'}</div>
  <div class="card"><h2>Sichern</h2><div class="mu">Daten liegen nur auf diesem Gerät. Zum Umziehen exportieren.</div>
  <button class="p" onclick="exp()">Exportieren</button>
- <input type="file" accept=".json" style="margin-top:8px" onchange="imp(this.files[0])"></div>`;
+ <input type="file" accept=".json" style="margin-top:8px" onchange="imp(this.files[0])"></div>
+ <div class="mu" style="text-align:center;font-size:11px;margin-top:6px">Diese App wird präsentiert von Anian<br>Wetterdaten: Open-Meteo.com</div>`;
 }
 function exp(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="was-anziehen.json";a.click()}
 function imp(f){if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);S.items=d.items||S.items;S.entries=d.entries||[];save();note="Importiert.";render()}catch(e){note="Datei ungültig."}})}
