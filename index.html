@@ -107,7 +107,7 @@ function add(){
 }
 function schrank(){
  return`<div class="card"><h2>Mein Kleiderschrank</h2><div class="mu">Haken = besitze ich. Wärmewert anpassbar.</div>
- ${S.items.map((i,k)=>`<div class="row"><label style="display:flex;gap:8px;align-items:center;color:var(--tx);font-size:16px"><input type="checkbox" style="width:auto" ${i.own?"checked":""} onchange="S.items[${k}].own=this.checked?1:0;save()">${esc(i.name)}</label>${i.layer==="acc"?"":`<input type="number" step="0.5" value="${i.w}" onchange="S.items[${k}].w=parseFloat(this.value)||0;save()">`}<button class="s" onclick="delItem(${k})">✕</button></div>`).join("")}</div>
+ ${S.items.map((i,k)=>`<div class="row"><label style="display:flex;gap:8px;align-items:center;color:var(--tx);font-size:16px"><input type="checkbox" style="width:auto" ${i.own?"checked":""} onchange="S.items[${k}].own=this.checked?1:0;save()">${esc(i.name)}</label>${i.layer==="acc"?"":`<input type="number" step="0.5" value="${i.w}" onchange="S.items[${k}].w=parseFloat(this.value)||0;save()">`}<span style="display:flex;gap:4px"><button class="s" onclick="renItem(${k})">✎</button><button class="s" onclick="delItem(${k})">✕</button></span></div>`).join("")}</div>
  <div class="card"><h2>Teil hinzufügen</h2><div class="g"><div><label>Name</label><input id="nn"></div>
  <div><label>Schicht</label><select id="nl"><option value="base">Unterschicht</option><option value="mid">Mittelschicht</option><option value="outer">Jacke</option><option value="acc">Zubehör (z. B. Schirm)</option></select></div>
  <div><label>Wärme</label><input id="nw" type="number" step="0.5" value="2"></div>
@@ -117,6 +117,7 @@ function schrank(){
 }
 function addItem(){const n=$("#nn").value.trim();if(!n)return;const p=+$("#np").value;
  S.items.push({id:"c"+Date.now(),name:n,layer:$("#nl").value,w:parseFloat($("#nw").value)||0,wind:p>=1?1:0,rain:p===2?1:0,trig:$("#nt").value,own:1});save();render()}
+function renItem(k){const n=prompt("Neuer Name:",S.items[k].name);if(n&&n.trim()){S.items[k].name=n.trim();save();render()}}
 function delItem(k){if(confirm("Wirklich löschen?")){S.items.splice(k,1);save();render()}}
 function daten(){
  return`<div class="card"><h2>Einträge (${S.entries.length})</h2>
